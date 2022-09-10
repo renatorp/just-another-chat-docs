@@ -1,13 +1,14 @@
-
 # Just Another Chat
 
-## Contexto
+## Visão Geral
 
-O Chat é um projeto criado com a intenção de exercitar as habilidades de arquitetura de sistemas, desde a modelagem até o desenho da infraestrutura.
+A empresa ABC, provedora de serviços de email, percebeu que poderia aumentar o engajamento de seus usuário através da criação de um chat integrado ao seu ecosistema. Essa empresa já possui uma base com milhões de usuário, e utilizando o chat, ela poderia se consolidar ainda mais aumentando sua base, e consequentemente, ganhando mercado.
 
-A ideia é que seja modelado um sistema de chat escalável que permita conversas em tempo real.
+A ideia é que um chat seja disponibilizado junto ao email no seu sistema web, e que exista um aplicativo independente disponível para iOS e Android. Pessoas físicas ou jurídicas também poderão fazer uso do chat para notificações automáticas integradas à outros sistema. 
 
-## Requisitos
+## Guias arquiteturais
+
+### Requisitos funcionais
 
  - A transmissão de mensagens deve ser instantânea(real time);
  - A troca de mensagens deve ser de um para um(mensagem direta), ou um para muitos(grupo);
@@ -32,9 +33,24 @@ A ideia é que seja modelado um sistema de chat escalável que permita conversas
  - Notificações de conversas podem ser mutadas;
  - Menções devem gerar notificações mesmo que a conversa esteja mutada;
 
+### Atributos de qualidade
+ - Escalabilidade
+ - Disponibilidade
+ - Desempenho
+ - Segurança (TODO)
+
+### Cenários
+ - Escalabilidade -> Aumento no throughput -> O sistema deve se manter responsivo após um aumento de 5 vezes a média de acessos em condições normais;
+ - Desempenho -> Tempo de resposta de transação -> O tempo de resposta das transações deve ser de no máximo 500ms;
+ - Disponibilidade -> uptimpe -> O sitema deve estar disponível por no mínimo 99% do tempo;
+ - Desempenho -> Tempo de envio de notificações -> O sistema deverá notificar o usuário sobre uma nova mensagem em no máximo 2s a partir do momento da publicação;
+ - Desempenho -> Tempo de envio de mensagem -> O usuário deverá receber a notificação em seu chat em no máximo 2s a partir do momento da publicação;
+ - Desempenho -> Tempo de publicação de mensagem de texto -> A publicação de mensagens de texto deve acontecer em no máximo 500ms;
+ - Desempenho -> Tempo de publicação de mensagem de mídia -> A publicação de mensagens de mídia deve acontecer em no máximo 2min;
+
+## Decisões de Design
 
 ### Class diagram
-
 ```mermaid
 classDiagram
     class Conversation{
@@ -159,10 +175,10 @@ classDiagram
 
 ```
 
-### System-context-diagram
+### System context diagram
 
 ```mermaid
-C4Context
+    C4Context
       title System Context diagram for Chat System
       Person(user, "Chat User", "A user authenticated on chat system.")
       Person(3rd, "3rd Party System", "Third party systems interacting through apis.")
@@ -172,7 +188,96 @@ C4Context
       Rel(user, chat, "uses")
       Rel(3rd, chat, "uses")
 ```
-### Container-diagram
 
-### Component-diagram
+### Container diagram
+
+```mermaid
+    C4Container
+      title Container diagram for Chat System
+      Person(user, "Chat User", "A user authenticated on chat system.")
+      Person(3rd, "3rd Party System", "Third party systems interacting through apis.")
+
+    Container_Boundary(chat, "Chat System") {
+        Container_Ext(mobile_app, "Mobile App", "iOS/Android", "Mobile app used by users to interact on chat")
+        Container_Ext(web_app, "Web App", "Node,Javascript", "Web app used by users to interact on chat")
+
+        Container(lb, "Load Balancer", "Nginx", "Balance load to chat api cluster")
+        ContainerDb(file_storage, "File storage service", "File storage service", "Service to store uploaded files")
+        Container(backend_api, "Backend API", "Java, Docker container", "Provides chat functionality via api")
+        Container(notification_service, "Notification Service", "Java, Docker container/Serverless Function", "Service responsible for sending push notifications")
+        ContainerDb(db, "Chat DB", "NOSQL Database", "Chat system main database")
+        ContainerDb(notification_db, "Notification DB", "NOSQL Database", "Database to support dealing with notifications")
+        Container_Ext(fcm_apns, "FCM & APNS", "FCM & APNS", "Mobile platforms notification services")
+        
+    }
+
+    Rel(user, mobile_app, "Uses")
+    Rel(user, web_app, "Uses")
+    Rel(web_app, lb, "Uses")
+    Rel(mobile_app, lb, "Uses")
+    Rel(3rd, lb, "Uses")
+    Rel(lb, backend_api, "Balances load to")
+    Rel(backend_api, db, "Reads from and writes to")
+    Rel(notification_service, fcm_apns, "Reads from and writes to")
+    Rel(notification_service, notification_db, "Sends notifications to")
+    Rel(backend_api, notification_service, "Uses")
+    Rel(mobile_app, file_storage, "Uploads to")
+    Rel(web_app, file_storage, "Uploads to")
+    Rel(backend_api, file_storage, "Load uploaded files from")
+
+     UpdateLayoutConfig($c4BoundaryInRow="2")
+```
+
+### Component diagram
+TODO
+
+
+## Abordagens arquiteturais
+ - Contadores materializados (desempenho)
+ - Utilização de protocolo full-duplex (desempenho)
+ - Banco de dados não relacional (escalabilidade)
+ - Cluster de servidores acessados por load balancer de alta disponibilidade (disponibilidade)
+ - Utilização de serviço de armazenamento para uploads de arquivos
+ - Redução da qualidade de vídeos enviados pelo app;
+
+
+## Riscos
+ - Tamanho da mídia postada consumir consideravelmente pacote de dados da operadora de internet móvel do usuário;
+ - Processamento local de vídeos comprometer desempenho ou bateria de smartphones com pouco recurso de hardware;
+ - Time de desenvolvedores ter dificuldades em lidar com protocolo com o qual não possuem familiaridade;
+ - Processamento de notificações de grupos que possuem muitos membros causar atraso no envio das notificações;
+
+## Não-riscos
+ - Perder usuários da base;
+
+## Pontos de sensibilidade
+ - Quantidade de nós no cluster;
+
+## Tradeoffs
+ - O bit rate definido para os videos serem convertidos antes de serem enviados;
+
+
+### APIs
+
+TODO
+
+### Data Storage
+
+TODO
+
+### Degree of constraint
+
+TODO
+
+## Alternatives considered
+
+TODO
+
+## Cross-cutting concerns
+
+Segurança TODO
+
+## People
+10/09/2020 - Criação. Autor: renato.ribeiro
+
 
