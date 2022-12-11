@@ -198,7 +198,7 @@ classDiagram
 ### Container diagram
 
 ```mermaid
-     C4Container
+    C4Container
       title Container diagram for Chat System
       Person(user, "Chat User", "A user authenticated on chat system.")
       Person(3rd, "3rd Party System", "Third party systems interacting through apis.")
@@ -207,8 +207,9 @@ classDiagram
         
         Container_Ext(mobile_app, "Mobile App", "iOS/Android", "Mobile app used by users to interact on chat")
         Container_Ext(web_app, "Web App", "Node,Javascript", "Web app used by users to interact on chat")
-
+        
         Container(auth, "Authentication Service", "Service", "Service responsible for authenticating users")
+
         Container(lb, "Load Balancer", "Nginx", "Balance load to chat api cluster")
         ContainerDb(file_storage, "File storage service", "File storage service", "Service to store uploaded files")
         Container(backend_api, "Backend API", "Java, Docker container", "Provides chat functionality via api")
@@ -224,6 +225,7 @@ classDiagram
     Rel(mobile_app, lb, "Uses")
     Rel(web_app, auth, "Uses")
     Rel(mobile_app, auth, "Uses")
+
     Rel(3rd, lb, "Uses")
     Rel(lb, backend_api, "Balances load to")
     Rel(backend_api, db, "Reads from and writes to")
@@ -334,7 +336,6 @@ TODO
 TODO
 
 ## Cross-cutting concerns
-
 Segurança
 Privacidade
 
