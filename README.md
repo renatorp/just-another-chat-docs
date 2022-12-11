@@ -257,6 +257,8 @@ C4Container
         Component(storage, "Storage Service", "Service", "Provides mechanisms for using external file storage")
         Component(event, "Event Service", "Service", "Provides mechanisms for notifying changes in the system")
      
+        ComponentQueue(eventqueue, "Event Queue", "Queue of application events")
+
         Rel(messagec, chatservice, "Uses")
         Rel(conversationc, chatservice, "Uses")
         Rel(userc, chatservice, "Uses")
@@ -282,7 +284,8 @@ C4Container
     Rel(3rd, integrationc, "Uses", "JSON/HTTPS")
 
     Rel(chatdao, db, "Uses")
-    Rel(event, notification_service, "Send events to")
+    Rel(event, eventqueue, "Send events to")
+    Rel_Back(eventqueue, notification_service, "Consume events from")
     Rel(storage, file_storage, "Send/get files from/to")
 
 UpdateLayoutConfig($c4ShapeInRow="3")
