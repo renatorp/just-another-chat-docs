@@ -336,8 +336,8 @@ TODO
 TODO
 
 ## Cross-cutting concerns
-Segurança
-Privacidade
+- Segurança
+- Privacidade
 
 ## Authors
 10/09/2020 - Criação. Autor: renato.ribeiro
