@@ -33,11 +33,15 @@ A ideia é que um chat seja disponibilizado junto ao email no seu sistema web, e
  - Notificações de conversas podem ser mutadas;
  - Menções devem gerar notificações mesmo que a conversa esteja mutada;
 
+### Restrições
+ - A autenticação deve ser efetuada utilizando serviço de autenticação já utilizado pelos outros serviços da empresa ABC;
+
 ### Atributos de qualidade
  - Escalabilidade
  - Disponibilidade
  - Desempenho
- - Segurança (TODO)
+ - Segurança
+ - Privacidade
 
 ### Cenários
  - Escalabilidade -> Aumento no throughput -> O sistema deve se manter responsivo após um aumento de 5 vezes a média de acessos em condições normais;
@@ -47,6 +51,8 @@ A ideia é que um chat seja disponibilizado junto ao email no seu sistema web, e
  - Desempenho -> Tempo de envio de mensagem -> O usuário deverá receber a notificação em seu chat em no máximo 2s a partir do momento da publicação;
  - Desempenho -> Tempo de publicação de mensagem de texto -> A publicação de mensagens de texto deve acontecer em no máximo 500ms;
  - Desempenho -> Tempo de publicação de mensagem de mídia -> A publicação de mensagens de mídia deve acontecer em no máximo 2min;
+ - Segurança -> Acesso não autenticado -> apis devem rejeitar requisições com status 401;
+ - Privacidade -> ???
 
 ## Decisões de Design
 
@@ -198,8 +204,11 @@ classDiagram
       Person(3rd, "3rd Party System", "Third party systems interacting through apis.")
 
     Container_Boundary(chat, "Chat System") {
+        
         Container_Ext(mobile_app, "Mobile App", "iOS/Android", "Mobile app used by users to interact on chat")
         Container_Ext(web_app, "Web App", "Node,Javascript", "Web app used by users to interact on chat")
+        
+        Container(auth, "Authentication Service", "Service", "Service responsible for authenticating users")
 
         Container(lb, "Load Balancer", "Nginx", "Balance load to chat api cluster")
         ContainerDb(file_storage, "File storage service", "File storage service", "Service to store uploaded files")
@@ -208,13 +217,15 @@ classDiagram
         ContainerDb(db, "Chat DB", "NOSQL Database", "Chat system main database")
         ContainerDb(notification_db, "Notification DB", "NOSQL Database", "Database to support dealing with notifications")
         Container_Ext(fcm_apns, "FCM & APNS", "FCM & APNS", "Mobile platforms notification services")
-        
     }
 
     Rel(user, mobile_app, "Uses")
     Rel(user, web_app, "Uses")
     Rel(web_app, lb, "Uses")
     Rel(mobile_app, lb, "Uses")
+    Rel(web_app, auth, "Uses")
+    Rel(mobile_app, auth, "Uses")
+
     Rel(3rd, lb, "Uses")
     Rel(lb, backend_api, "Balances load to")
     Rel(backend_api, db, "Reads from and writes to")
@@ -225,12 +236,63 @@ classDiagram
     Rel(web_app, file_storage, "Uploads to")
     Rel(backend_api, file_storage, "Load uploaded files from")
 
-     UpdateLayoutConfig($c4BoundaryInRow="2")
+    UpdateLayoutConfig($c4BoundaryInRow="2")
 ```
 
 ### Component diagram
-TODO
 
+```mermaid
+C4Container
+    title Component diagram for Chat System Backend API
+    Container_Ext(mobile_app, "Mobile App", "iOS/Android", "Mobile app used by users to interact on chat")
+    Container_Ext(web_app, "Web App", "Node,Javascript", "Web app used by users to interact on chat")
+    Person(3rd, "3rd Party System", "Third party systems interacting through apis.")
+
+    Container_Boundary(api, "Chat System API") {
+        Component(messagec, "Message Controller", "MVC Rest Controller", "Provides Message api endpoints")
+        Component(conversationc, "Conversation Controller", "MVC Rest Controller", "Provides Conversation api endpoints")
+        Component(userc, "User Controller", "MVC Rest Controller", "Provides User api endpoints")
+        Component(integrationc, "Integration Controller", "MVC Rest Controller", "Provides api endpoints for 3rd party systems")
+
+        Component(chatservice, "Chat Service", "Service", "Service to handle chat business rules")
+        Component(chatdao, "Chat DAO", "DAO", "Provides access to chat db")
+        Component(storage, "Storage Service", "Service", "Provides mechanisms for using external file storage")
+        Component(event, "Event Service", "Service", "Provides mechanisms for notifying changes in the system")
+     
+        ComponentQueue(eventqueue, "Event Queue", "Queue of application events")
+
+        Rel(messagec, chatservice, "Uses")
+        Rel(conversationc, chatservice, "Uses")
+        Rel(userc, chatservice, "Uses")
+        Rel(integrationc, chatservice, "Uses")
+
+        Rel(chatservice, chatdao, "Uses")
+        Rel(chatservice, storage, "Uses")
+        Rel(chatservice, event, "Uses")
+    }
+
+    Container_Boundary(intcomp, "Chat System Internal Components") {
+        ContainerDb(db, "Chat DB", "NOSQL Database", "Chat system main database")
+        ContainerDb(file_storage, "File storage service", "File storage service", "Service to store uploaded files")
+        Container(notification_service, "Notification Service", "Java, Docker container/Serverless Function", "Service responsible for sending push notifications")
+    }
+
+    Rel(mobile_app, messagec, "Uses", "JSON/HTTPS")
+    Rel(mobile_app, conversationc, "Uses", "JSON/HTTPS")
+    Rel(mobile_app, userc, "Uses", "JSON/HTTPS")
+    Rel(web_app, messagec, "Uses", "JSON/HTTPS")
+    Rel(web_app, conversationc, "Uses", "JSON/HTTPS")
+    Rel(web_app, userc, "Uses", "JSON/HTTPS")
+    Rel(3rd, integrationc, "Uses", "JSON/HTTPS")
+
+    Rel(chatdao, db, "Uses")
+    Rel(event, eventqueue, "Send events to")
+    Rel_Back(eventqueue, notification_service, "Consume events from")
+    Rel(storage, file_storage, "Send/get files from/to")
+
+UpdateLayoutConfig($c4ShapeInRow="3")
+    
+```
 
 ## Abordagens arquiteturais
  - Contadores materializados (desempenho)
@@ -238,7 +300,7 @@ TODO
  - Banco de dados não relacional (escalabilidade)
  - Cluster de servidores acessados por load balancer de alta disponibilidade (disponibilidade)
  - Utilização de serviço de armazenamento para uploads de arquivos
- - Redução da qualidade de vídeos enviados pelo app;
+ - Redução da qualidade de vídeos enviados pelo app (desempenho);
 
 
 ## Riscos
@@ -248,7 +310,7 @@ TODO
  - Processamento de notificações de grupos que possuem muitos membros causar atraso no envio das notificações;
 
 ## Não-riscos
- - Perder usuários da base;
+ - Usuários deixarem de utilizar o App;
 
 ## Pontos de sensibilidade
  - Quantidade de nós no cluster;
@@ -274,10 +336,8 @@ TODO
 TODO
 
 ## Cross-cutting concerns
+- Segurança
+- Privacidade
 
-Segurança TODO
-
-## People
+## Authors
 10/09/2020 - Criação. Autor: renato.ribeiro
-
-

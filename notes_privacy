@@ -1,0 +1,26 @@
+ the individual should be informed about which data is processed about it and by whom
+
+providing the individual with the option to give and withdraw consent and to provide the
+individual with the possibility to amend its data once it is being processed by a data processor.
+
+ ensure no unauthorized access can take place 
+
+ Tactics such as logging of modifications on data and auditing of reports are usually attributed
+to accountability tactics, but can also contribute to discovering whether unauthorized
+accesses have occurred
+
+Tactics that mitigate the impact of unauthorized access, such as unlinkability and data minimalization.
+When unlinkability is practiced, the
+link between two items of interest (individuals, messages, data about the individual) is removed, meaning that it is more difficult to determine the connection between these items of interest in case of unauthorized access [46]. When less data is known about an identified individual in unauthorized access, the impact of the privacy violation is also mitigated. When unlinkability is practiced to such an extent that the individual cannot be identified in the
+breach, the privacy violation remains a ‘mere’ unauthorized access instead of a privacy violation. It can thus be argued that anonymization and pseudonymization are ways of achieving unlinkability
+
+ ensure that any access to data is done with consent of the individual. For example by asking for consent to place cookies on the individuals
+device
+
+
+Definition by Alan Westin: “Privacy is the claim of individuals,groups, or institutions to determine for themselves when, how, and to what extent information about them is communicated to others.”
+
+ - criptografia de mensagens
+ - anonimização
+ - possibilidade do usuário solicitar cópia de suas conversas
+ - termo de uso e política de privacidade
