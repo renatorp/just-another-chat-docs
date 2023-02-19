@@ -32,6 +32,7 @@ A ideia é que um chat seja disponibilizado junto ao email no seu sistema web, e
  - Novas mensagens devem gerar notificações;
  - Notificações de conversas podem ser mutadas;
  - Menções devem gerar notificações mesmo que a conversa esteja mutada;
+ - Conversas ou threads não serão apagadas, apenas mensagens;
 
 ### Restrições
  - A autenticação deve ser efetuada utilizando serviço de autenticação já utilizado pelos outros serviços da empresa ABC;
@@ -52,7 +53,7 @@ A ideia é que um chat seja disponibilizado junto ao email no seu sistema web, e
  - Desempenho -> Tempo de publicação de mensagem de texto -> A publicação de mensagens de texto deve acontecer em no máximo 500ms;
  - Desempenho -> Tempo de publicação de mensagem de mídia -> A publicação de mensagens de mídia deve acontecer em no máximo 2min;
  - Segurança -> Acesso não autenticado -> apis devem rejeitar requisições com status 401;
- - Privacidade -> ???
+ - Privacidade -> Dados pessoais em requisições -> api's não devem expor dados pessoais dos usuários;
 
 ## Decisões de Design
 
@@ -197,62 +198,71 @@ classDiagram
 
 ### Container diagram
 
-```mermaid
-    C4Container
-      title Container diagram for Chat System
-      Person(user, "Chat User", "A user authenticated on chat system.")
-      Person(3rd, "3rd Party System", "Third party systems interacting through apis.")
+```plantuml
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 
-    Container_Boundary(chat, "Chat System") {
-        
-        Container_Ext(mobile_app, "Mobile App", "iOS/Android", "Mobile app used by users to interact on chat")
-        Container_Ext(web_app, "Web App", "Node,Javascript", "Web app used by users to interact on chat")
-        
-        Container(auth, "Authentication Service", "Service", "Service responsible for authenticating users")
+Person(user, "Chat User", "A user authenticated on chat system.")
+Person(3rd, "3rd Party System", "Third party systems interacting through apis.")
 
-        Container(lb, "Load Balancer", "Nginx", "Balance load to chat api cluster")
-        ContainerDb(file_storage, "File storage service", "File storage service", "Service to store uploaded files")
-        Container(backend_api, "Backend API", "Java, Docker container", "Provides chat functionality via api")
-        Container(notification_service, "Notification Service", "Java, Docker container/Serverless Function", "Service responsible for sending push notifications")
-        ContainerDb(db, "Chat DB", "NOSQL Database", "Chat system main database")
-        ContainerDb(notification_db, "Notification DB", "NOSQL Database", "Database to support dealing with notifications")
-        Container_Ext(fcm_apns, "FCM & APNS", "FCM & APNS", "Mobile platforms notification services")
-    }
+Container_Boundary(chat, "Chat System") {
+     Container_Ext(mobile_app, "Mobile App", "iOS/Android", "Mobile app used by users to interact on chat")
+     Container_Ext(web_app, "Web App", "Node,Javascript", "Web app used by users to interact on chat")   
+     Container(api_gateway, "API Gateway", "Java, Docker container", "3rd party gateway service") 
+     ContainerDb(file_storage, "File storage service", "File storage service", "Service to store uploaded files")
 
-    Rel(user, mobile_app, "Uses")
-    Rel(user, web_app, "Uses")
-    Rel(web_app, lb, "Uses")
-    Rel(mobile_app, lb, "Uses")
-    Rel(web_app, auth, "Uses")
-    Rel(mobile_app, auth, "Uses")
+     Container_Boundary(chat_service, "Chat Service") {
+         Container(backend_api, "Backend API", "Java, Docker container", "Provides chat functionality via api")
+         ContainerDb(db, "Chat DB", "NOSQL Database", "Chat system main database")
+     }
 
-    Rel(3rd, lb, "Uses")
-    Rel(lb, backend_api, "Balances load to")
-    Rel(backend_api, db, "Reads from and writes to")
-    Rel(notification_service, fcm_apns, "Reads from and writes to")
-    Rel(notification_service, notification_db, "Sends notifications to")
-    Rel(backend_api, notification_service, "Uses")
-    Rel(mobile_app, file_storage, "Uploads to")
-    Rel(web_app, file_storage, "Uploads to")
-    Rel(backend_api, file_storage, "Load uploaded files from")
+     Container_Boundary(notification, "Notification Service") {
+         Container(notification_service, "Notification Service", "Java, Docker container/Serverless Function", "Service responsible for sending push notifications")
+         ContainerDb(notification_db, "Notification DB", "NOSQL Database", "Database to support dealing with notifications")
+     }
+}
 
-    UpdateLayoutConfig($c4BoundaryInRow="2")
+Container_Ext(auth, "Authentication Service", "Service", "Service responsible for authenticating users")
+Container_Ext(fcm_apns, "FCM & APNS", "FCM & APNS", "Mobile platforms notification services")
+
+Rel(user, mobile_app, "Uses")
+Rel(user, web_app, "Uses")
+Rel(3rd, api_gateway, "Uses")
+
+Rel(mobile_app, file_storage, "Uploads to")
+Rel(web_app, file_storage, "Uploads to")
+Rel(backend_api, db, "Reads from and writes to")
+Rel(api_gateway, backend_api, "Calls")
+Rel(web_app, backend_api, "Calls")
+Rel(mobile_app, backend_api, "Calls")
+Rel_L(backend_api, file_storage, "Load uploaded files from")
+Rel(notification_service, notification_db, "Reads from and writes to")
+Rel(notification_service, fcm_apns, "Saves notifications to")
+
+Rel_L(mobile_app, auth, "Authenticates on")
+Rel_L(web_app, auth, "Authenticates on")
+Rel_L(api_gateway, auth, "Authenticates on")
+Rel_L(backend_api, auth, "Validades authentication")
+Rel(backend_api, notification_service, "Uses")
+
+@enduml
 ```
 
 ### Component diagram
 
-```mermaid
-C4Container
-    title Component diagram for Chat System Backend API
+```plantuml
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
     Container_Ext(mobile_app, "Mobile App", "iOS/Android", "Mobile app used by users to interact on chat")
     Container_Ext(web_app, "Web App", "Node,Javascript", "Web app used by users to interact on chat")
-    Person(3rd, "3rd Party System", "Third party systems interacting through apis.")
+    Container_Ext(api_gateway, "API Gateway", "Java, Docker", "Third party systems interacting through apis.")
 
     Container_Boundary(api, "Chat System API") {
+        Component(dispatcher, "Request Dispatcher", "Spring Servlet Dispatcher", "Dispatch Request to Spring Controllers")
         Component(messagec, "Message Controller", "MVC Rest Controller", "Provides Message api endpoints")
         Component(conversationc, "Conversation Controller", "MVC Rest Controller", "Provides Conversation api endpoints")
         Component(userc, "User Controller", "MVC Rest Controller", "Provides User api endpoints")
-        Component(integrationc, "Integration Controller", "MVC Rest Controller", "Provides api endpoints for 3rd party systems")
 
         Component(chatservice, "Chat Service", "Service", "Service to handle chat business rules")
         Component(chatdao, "Chat DAO", "DAO", "Provides access to chat db")
@@ -264,7 +274,7 @@ C4Container
         Rel(messagec, chatservice, "Uses")
         Rel(conversationc, chatservice, "Uses")
         Rel(userc, chatservice, "Uses")
-        Rel(integrationc, chatservice, "Uses")
+        
 
         Rel(chatservice, chatdao, "Uses")
         Rel(chatservice, storage, "Uses")
@@ -277,21 +287,20 @@ C4Container
         Container(notification_service, "Notification Service", "Java, Docker container/Serverless Function", "Service responsible for sending push notifications")
     }
 
-    Rel(mobile_app, messagec, "Uses", "JSON/HTTPS")
-    Rel(mobile_app, conversationc, "Uses", "JSON/HTTPS")
-    Rel(mobile_app, userc, "Uses", "JSON/HTTPS")
-    Rel(web_app, messagec, "Uses", "JSON/HTTPS")
-    Rel(web_app, conversationc, "Uses", "JSON/HTTPS")
-    Rel(web_app, userc, "Uses", "JSON/HTTPS")
-    Rel(3rd, integrationc, "Uses", "JSON/HTTPS")
+    Rel(mobile_app, dispatcher, "SendS requests to", "JSON/HTTPS")
+    Rel(web_app, dispatcher, "SendS requests to", "JSON/HTTPS")
+    Rel(api_gateway, dispatcher, "SendS requests to", "JSON/HTTPS")
+
+    Rel(dispatcher, messagec, "Dispatches requests to", "JSON/HTTPS")
+    Rel(dispatcher, conversationc, "Dispatches requests to", "JSON/HTTPS")
+    Rel(dispatcher, userc, "Dispatches requests to", "JSON/HTTPS")    
 
     Rel(chatdao, db, "Uses")
     Rel(event, eventqueue, "Send events to")
     Rel_Back(eventqueue, notification_service, "Consume events from")
     Rel(storage, file_storage, "Send/get files from/to")
 
-UpdateLayoutConfig($c4ShapeInRow="3")
-    
+@enduml
 ```
 
 ## Abordagens arquiteturais
@@ -300,32 +309,182 @@ UpdateLayoutConfig($c4ShapeInRow="3")
  - Banco de dados não relacional (escalabilidade)
  - Cluster de servidores acessados por load balancer de alta disponibilidade (disponibilidade)
  - Utilização de serviço de armazenamento para uploads de arquivos
- - Redução da qualidade de vídeos enviados pelo app (desempenho);
+ - Redução da qualidade de vídeos no app antes de enviar para o backend (desempenho);
+ - Autenticação utilizando OAuth + JWT para usuários e API Key para integrações(developer api) (segurança)
+ - Autorização utilizando Oauth e roles de usuário já mantidos pelo serviço de autenticação (segurança)
+ - Utilização de índices para padrões de acesso de busca de membros (ex: envio de notificações)
 
 
 ## Riscos
  - Tamanho da mídia postada consumir consideravelmente pacote de dados da operadora de internet móvel do usuário;
  - Processamento local de vídeos comprometer desempenho ou bateria de smartphones com pouco recurso de hardware;
  - Time de desenvolvedores ter dificuldades em lidar com protocolo com o qual não possuem familiaridade;
- - Processamento de notificações de grupos que possuem muitos membros causar atraso no envio das notificações;
+ - Processamento de notificações de grupos que possuem muitos membros causar atraso no envio das notificações; 
+ - Indisponibilidade do serviço de autenticação.
 
 ## Não-riscos
  - Usuários deixarem de utilizar o App;
 
 ## Pontos de sensibilidade
- - Quantidade de nós no cluster;
+ - Quantidade de nós no cluster da aplicação; 
+ - Quantidade de nós no cluster do banco;
+ - Tamanho das máquinas do banco;
 
 ## Tradeoffs
- - O bit rate definido para os videos serem convertidos antes de serem enviados;
+ - O bit rate definido para a conversão local dos videos antes do envio para o backend;
 
+
+### Padrões de acesso
+
+ - (read) Listar conversas de um usuário(membro), com as que estiverem fixadas no topo (crítico);
+ - (read) Listar mensagens de uma conversa (crítico);
+ - (read) Listar usuários de um grupo, identificando quais são admins (baixo thp);
+ - (read) Listar usuários para criar um grupo (baixo thp);
+ - (read) Listar reações de uma mensagem (não crítico);
+ - (read) Listar threads de um grupo (crítico);
+ - (read) Listar mensagens de uma thread (crítico);
+ - (read) Listar resposta de uma mensagem;
+ - (write) Criar uma conversa/grupo; (crítico)
+ - (write) Criar uma thread em um grupo; (crítico)
+ - (write) Criar uma mensagem em uma conversa/thread; (crítico)
+ - (write) Reagir a uma mensagem; (não crítico)
+ - (write) Apagar uma mensagem (não crítico, baixo thp);
+ - (write) Visualizar uma mensagem (não crítico, alto thp);
+ - (write) Incluir membro a um grupo (não crítico, baixo thp);
+ - (write) Remover membro de um grupo (crítico, baixo thp).
+
+
+### Potenciais índices
+
+ - conversation_member.user_id
+ - conversation.id
+ - message.conversation_id
+ 
+
+### Data Storage
+
+```plantuml
+@startuml
+Title User
+
+label B [
+{{json
+{
+  "id": 1,
+  "name": "John Doe",
+  "picture": "https://robohash.org/johndoe",
+  "last_active_time": "2022-01-27T13:27:55Z",
+  "conversations": [
+    {
+      "id": 1,
+      "muted": false,
+      "pinned": false
+    }
+  ]
+}
+}}
+]
+@enduml
+```
+
+```plantuml
+@startuml
+Title Conversation
+
+label B [
+{{json
+{
+  "id": 1,
+  "author_id": 1,
+  "last_message_date": "2022-01-27T13:27:55Z",
+  "type": "GROUP",
+  "group_name": "The Group",
+  "group_picture": "url",
+  "group_description": "description",
+  "members": [
+    {
+      "id": 1,
+      "member_type": "ADMIN"
+    }
+  ],
+  "messages": [10,22,55],
+  "threads": [{
+    "id": 1,
+    "author_id": 1,
+    "create_date": "2022-01-27T13:27:55Z",
+    "messages": [1,2,3]
+  }]
+}
+}}
+]
+@enduml
+```
+
+```plantuml
+@startuml
+Title Message
+
+label B [
+{{json
+{
+   "id": 2,
+   "text": "a message",
+   "publishDate": "2022-01-27T14:00:01Z",
+   "deleted": false,
+   "author_id": 1,
+   "replied_id": 1,
+   "media_url": "url",
+   "size": 55544,
+   "duration": 255,
+   "num_views": 1,
+   "num_receives": 2
+}
+}}
+]
+@enduml
+```
+
+```plantuml
+@startuml
+Title MessageView
+
+label B [
+{{json
+{
+  "id": 1,
+  "receive_date": "2022-01-27T14:00:01Z",
+  "view_date": "2022-01-27T14:00:01Z",
+  "message_id": 2,
+  "user_id": 2
+}
+}}
+]
+@enduml
+```
+
+```plantuml
+@startuml
+Title MessageReaction
+
+label B [
+{{json
+{
+  "id": 1,
+  "date": "2022-01-27T14:00:01Z",
+  "type": "U+1F600",
+  "message_id": 2,
+  "user_id": 2
+}
+}}
+]
+@enduml
+```
 
 ### APIs
 
 TODO
-
-### Data Storage
-
-TODO
+*** em sessão de api
+stoplight.io
 
 ### Degree of constraint
 
@@ -333,7 +492,7 @@ TODO
 
 ## Alternatives considered
 
-TODO
+SAAS (getstream, rocket chat, sendbird)
 
 ## Cross-cutting concerns
 - Segurança
